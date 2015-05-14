@@ -90,12 +90,19 @@ module.exports = function(file, opt) {
     // Fork a new worker. Give it a recluster ID and
     // also redirect all its messages to the cluster.
     function fork(wid) {
+        cluster.setupMaster({exec: file});
+        cluster.settings.args = opt.args;
         var w = cluster.fork({WORKER_ID: wid});
         w._rc_wid = wid;
         w._rc_isReplaced = false;
         w.on('message', function(message) {
             emit('message', w, message);
         });
+        w.on('exit', function () {emit('exit', w);});
+        w.on('disconnect', function () {emit('disconnect', w);});
+        w.on('listening', function (addr) {emit('listening', w, addr);});
+        w.on('online', function () {emit('online', w);});
+
         w.process.on('exit', function() {
             var windex = self.workers.indexOf(w);
             if (windex >= 0)
@@ -186,14 +193,7 @@ module.exports = function(file, opt) {
 
     self.run = function() {
         if (!cluster.isMaster) return;
-        cluster.setupMaster({exec: file});
-        cluster.settings.args = opt.args;
         for (var i = 0; i < opt.workers; i++) fork(i);
-
-        cluster.on('exit', workerEmitExit);
-        cluster.on('disconnect', workerDisconnect);
-        cluster.on('listening', workerListening);
-        cluster.on('online', workerOnline);
 
         channel.on(readyEvent, function workerReady(w, arg) {
             // ignore unrelated messages when readyEvent = message
@@ -261,10 +261,6 @@ module.exports = function(file, opt) {
 
     self.stop = function() {
         if (!cluster.isMaster) return;
-        cluster.removeListener('exit', workerEmitExit);
-        cluster.removeListener('disconnect', workerDisconnect);
-        cluster.removeListener('listening', workerListening);
-        cluster.removeListener('online', workerOnline);
         respawners.cancel();
 
         channel.removeAllListeners();
