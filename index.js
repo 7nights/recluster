@@ -185,12 +185,6 @@ module.exports = function(file, opt) {
 
     }
 
-    // Redirect most events
-    function workerListening(w, adr) { emit('listening', w, adr); }
-    function workerOnline(w) { emit('online', w); }
-    function workerDisconnect(w) { emit('disconnect', w); }
-    function workerEmitExit(w) { emit('exit', w); }
-
     self.run = function() {
         if (!cluster.isMaster) return;
         for (var i = 0; i < opt.workers; i++) fork(i);
